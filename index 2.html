@@ -1,0 +1,93 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NYC Landlord ROI Calculator</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const LandlordCalculator = () => {
+      const [inputs, setInputs] = useState({
+        layout: '1BR',
+        borough: 'Manhattan',
+        monthlyRent: 4000,
+        tenancyLength: 3,
+        frboVacancyDays: 24,
+        brokerVacancyDays: 12,
+        rentPremium: 8
+      });
+
+      const [results, setResults] = useState({});
+
+      const defaults = {
+        Manhattan: { tenancy: 3, frboVacancy: 24, brokerVacancy: 12 },
+        Brooklyn: { tenancy: 3.5, frboVacancy: 27, brokerVacancy: 15 }
+      };
+
+      useEffect(() => {
+        const boroughDefaults = defaults[inputs.borough];
+        setInputs(prev => ({
+          ...prev,
+          tenancyLength: boroughDefaults.tenancy,
+          frboVacancyDays: boroughDefaults.frboVacancy,
+          brokerVacancyDays: Math.round(boroughDefaults.frboVacancy * 0.4)
+        }));
+      }, [inputs.borough]);
+
+      useEffect(() => {
+        const newBrokerVacancyDays = Math.round(inputs.frboVacancyDays * 0.4);
+        if (newBrokerVacancyDays !== inputs.brokerVacancyDays) {
+          setInputs(prev => ({ ...prev, brokerVacancyDays: newBrokerVacancyDays }));
+        }
+      }, [inputs.frboVacancyDays]);
+
+      useEffect(() => {
+        const dailyRent = inputs.monthlyRent / 30;
+        const dailyStreetEasyCost = 500 / 30;
+        const dailyVacancyCost = dailyRent + dailyStreetEasyCost;
+
+        const frboVacancyCost = (dailyVacancyCost * inputs.frboVacancyDays) + 400;
+        const brokerVacancyCost = (dailyRent * inputs.brokerVacancyDays) + 400;
+        const brokerFee = inputs.monthlyRent;
+        const tenancyMonths = inputs.tenancyLength * 12;
+
+        const frboGrossRent = inputs.monthlyRent * tenancyMonths;
+        const brokerMonthlyRent = inputs.monthlyRent * (1 + inputs.rentPremium / 100);
+        const brokerGrossRent = brokerMonthlyRent * tenancyMonths;
+
+        const frboNetIncome = frboGrossRent - frboVacancyCost;
+        const brokerNetIncome = brokerGrossRent - brokerVacancyCost - brokerFee;
+
+        const netGain = brokerNetIncome - frboNetIncome;
+        const percentageGain = frboNetIncome > 0 ? (netGain / frboNetIncome) * 100 : 0;
+
+        setResults({
+          dailyRent, brokerFee, netGain, percentageGain,
+          frboNetIncome, brokerNetIncome
+        });
+      }, [inputs]);
+
+      return (
+        <div style={{ padding: 20, fontFamily: 'Arial' }}>
+          <h1>NYC Landlord ROI Calculator</h1>
+          <p>Enter your rent and see how much more you could make using a broker.</p>
+          <label>Monthly Rent: $</label>
+          <input type="number" value={inputs.monthlyRent} onChange={(e) => setInputs({ ...inputs, monthlyRent: +e.target.value })} />
+          <p>Net Gain with Broker: ${results.netGain?.toFixed(0)}</p>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<LandlordCalculator />, document.getElementById('root'));
+  </script>
+</body>
+</html>
