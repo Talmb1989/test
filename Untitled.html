@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FRBO vs Broker ROI Calculator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      background: radial-gradient(circle at top, #fff1f2, #fde68a);
+      font-family: 'Arial Black', Gadget, sans-serif;
+    }
+    .blocky {
+      font-family: 'Impact', sans-serif;
+      letter-spacing: 1px;
+    }
+    .glass {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(10px);
+      border-radius: 1.5rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    }
+    .fun-button {
+      background: linear-gradient(90deg, #f43f5e, #f59e0b);
+      color: white;
+      font-weight: bold;
+      padding: 0.75rem 1.5rem;
+      border-radius: 9999px;
+      transition: transform 0.2s ease;
+    }
+    .fun-button:hover {
+      transform: scale(1.05);
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="min-h-screen flex flex-col items-center justify-center p-6">
+    <div class="max-w-xl w-full glass p-6 mb-8">
+      <h1 class="text-4xl blocky text-center mb-6 text-rose-600">💰 FRBO vs Broker ROI Calculator 💼</h1>
+
+      <label class="block text-lg blocky text-gray-800 mb-2">Your typical monthly rent:</label>
+      <input id="rent" type="number" value="3000" oninput="updateBrokerRent()" class="w-full p-3 mb-2 rounded-lg border border-gray-300" />
+
+      <p id="broker-rent-display" class="text-md text-gray-700 mb-4">Broker Rent (with 9% increase): $3,270</p>
+
+      <label class="block text-lg blocky text-gray-800 mb-2">Average tenancy length (years):</label>
+      <input id="years" type="number" step="0.1" value="2.5" class="w-full p-3 mb-4 rounded-lg border border-gray-300" />
+
+      <label class="block text-lg blocky text-gray-800 mb-2">Broker commission (months of rent):</label>
+      <input id="brokerFeeMonths" type="number" value="1" step="0.1" class="w-full p-3 mb-4 rounded-lg border border-gray-300" />
+
+      <button onclick="calculate()" class="fun-button w-full mt-4">🚀 Calculate ROI</button>
+
+      <div id="results" class="mt-6 text-center"></div>
+    </div>
+
+    <div class="max-w-2xl w-full">
+      <canvas id="roiChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    let chart;
+
+    function updateBrokerRent() {
+      const rent = parseFloat(document.getElementById('rent').value);
+      const brokerRent = (rent * 1.09).toLocaleString();
+      document.getElementById('broker-rent-display').innerText = `Broker Rent (with 9% increase): $${brokerRent}`;
+    }
+
+    function calculate() {
+      const rentFSBO = parseFloat(document.getElementById('rent').value);
+      const tenancyYears = parseFloat(document.getElementById('years').value);
+      const brokerPremium = 0.09;
+      const brokerFeeMonths = parseFloat(document.getElementById('brokerFeeMonths').value);
+      const rentIncreaseAnnual = 0.09;
+
+      function getAnnualIncomes(baseRent, years, withBroker = false) {
+        let income = [];
+        let currentRent = baseRent;
+        for (let i = 0; i < Math.floor(years); i++) {
+          income.push(currentRent * 12);
+          currentRent *= 1 + rentIncreaseAnnual;
+        }
+        const finalMonths = (years % 1) * 12;
+        if (finalMonths > 0) income.push(currentRent * finalMonths);
+        if (withBroker) income[0] -= baseRent * (1 + brokerPremium) * brokerFeeMonths;
+        return income;
+      }
+
+      const brokerRent = rentFSBO * (1 + brokerPremium);
+      const fsboIncome = getAnnualIncomes(rentFSBO, tenancyYears);
+      const brokerIncome = getAnnualIncomes(brokerRent, tenancyYears, true);
+
+      const fsboTotal = fsboIncome.reduce((a, b) => a + b, 0);
+      const brokerTotal = brokerIncome.reduce((a, b) => a + b, 0);
+      const netGain = brokerTotal - fsboTotal;
+      const brokerCommission = brokerRent * brokerFeeMonths;
+
+      document.getElementById('results').innerHTML = `
+        <div class="mt-6 bg-yellow-100 p-4 rounded-xl shadow-xl">
+          <h2 class="text-2xl blocky text-fuchsia-700 mb-2">📊 Results:</h2>
+          <p class="mb-2 text-gray-800 font-semibold">Current Rent: <strong>$${rentFSBO.toLocaleString()}</strong></p>
+          <p class="mb-4 text-gray-800 font-semibold">Broker Rent (with 9% increase): <strong>$${brokerRent.toLocaleString()}</strong></p>
+          <p class="mb-1 text-gray-800 font-semibold">Total income if you rent yourself: <strong>$${fsboTotal.toLocaleString(undefined, {maximumFractionDigits: 0})}</strong></p>
+          <p class="mb-1 text-gray-800 font-semibold">Total income using a broker: <strong>$${brokerTotal.toLocaleString(undefined, {maximumFractionDigits: 0})}</strong></p>
+          <p class="mb-1 text-gray-800 font-semibold">Broker commission: <strong>$${brokerCommission.toLocaleString(undefined, {maximumFractionDigits: 0})}</strong></p>
+          <p class="mt-2 text-green-700 text-xl font-bold">💸 Net Gain with Broker: $${netGain.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
+          <p class="text-sm text-gray-600 mt-3">
+            A 9% rent increase over a ${tenancyYears}-year tenancy nets <strong>$${netGain.toLocaleString(undefined, {maximumFractionDigits: 0})}</strong> even after the one-time brokerage fee.<br/>
+            Higher rent roll also means better refinancing terms and a higher exit price down the line.
+          </p>
+        </div>
+      `;
+
+      const ctx = document.getElementById('roiChart').getContext('2d');
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: fsboIncome.map((_, i) => `Year ${i + 1}`),
+          datasets: [
+            {
+              label: 'FSBO Income',
+              data: fsboIncome,
+              borderColor: '#e879f9',
+              backgroundColor: 'rgba(232, 121, 249, 0.2)',
+              tension: 0.3,
+              fill: true
+            },
+            {
+              label: 'Broker Income',
+              data: brokerIncome,
+              borderColor: '#34d399',
+              backgroundColor: 'rgba(52, 211, 153, 0.2)',
+              tension: 0.3,
+              fill: true
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Yearly Income Comparison: FSBO vs Broker'
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value) {
+                  return '$' + value.toLocaleString();
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    window.onload = updateBrokerRent;
+  </script>
+</body>
+</html>
